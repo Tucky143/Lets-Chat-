@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings - Chat Plus+</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* Basic resets and styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #f0f4f8;
+      color: #333;
+      padding: 20px;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    body.dark-mode {
+      background-color: #121212;
+      color: #ddd;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: background 0.3s ease;
+    }
+    body.dark-mode .container {
+      background: #1e1e1e;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .setting-item {
+      margin-bottom: 20px;
+    }
+    .setting-item label {
+      font-size: 1.1rem;
+      margin-right: 10px;
+    }
+    .danger-zone {
+      border: 2px solid red;
+      padding: 15px;
+      border-radius: 8px;
+      background-color: #ffe6e6;
+      margin-top: 40px;
+    }
+    .danger-zone h2 {
+      color: red;
+      margin-top: 0;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px 0;
+    }
+    .btn-primary {
+      background-color: #007bff;
+      color: #fff;
+    }
+    .btn-danger {
+      background-color: red;
+      color: #fff;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Settings</h1>
+
+    <!-- Theme Settings -->
+    <div class="setting-item">
+      <label for="themeSelect">Theme:</label>
+      <select id="themeSelect" onchange="onThemeChange(this.value)">
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="custom">Custom</option>
+      </select>
+      <input type="color" id="customColorPicker" style="display:none;" onchange="onCustomColorChange(this.value)">
+    </div>
+
+    <!-- Email Notifications for Recent Chats -->
+    <div id="notificationChatsList">
+      <h3>Enable Notifications for Chats:</h3>
+      <ul id="notificationChats">
+        <li>Loading recent chats...</li>
+      </ul>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="danger-zone">
+      <h2>Danger Zone</h2>
+      <p>Warning: These actions are irreversible!</p>
+      <button class="btn-danger" onclick="clearAllChatData()">Clear ALL Chat Data</button>
+      <button class="btn-danger" onclick="resetAppProcesses()">Reset App Processes</button>
+      <button class="btn-danger" onclick="checkCacheErrors()">Check Cache for Errors</button>
+    </div>
+
+    <!-- Save Settings -->
+    <div>
+      <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+      <button class="btn-secondary" onclick="showChat()">Back to Chat</button>
+    </div>
+  </div>
+
+  <script>
+    // Apply theme on page load
+    // Apply saved theme on page load
+    function applySavedTheme() {
+      const savedTheme = localStorage.getItem('theme') || 'light';
+      const customColor = localStorage.getItem('customColor');
+      if (savedTheme === 'dark') {
+        document.body.classList.add("dark-mode");
+        document.getElementById("themeSelect").value = "dark";
+      } else if (savedTheme === 'custom') {
+        document.body.style.backgroundColor = customColor || "#f0f4f8";
+        document.getElementById("themeSelect").value = "custom";
+        document.getElementById("customColorPicker").style.display = "inline-block";
+        document.getElementById("customColorPicker").value = customColor;
+      } else {
+        document.body.classList.remove("dark-mode");
+        document.body.style.backgroundColor = "";
+        document.getElementById("themeSelect").value = "light";
+      }
+    }
+
+    // Handle theme change in settings
+    function onThemeChange(theme) {
+      if (theme === "custom") {
+        document.getElementById("customColorPicker").style.display = "inline-block";
+      } else {
+        document.getElementById("customColorPicker").style.display = "none";
+      }
+      localStorage.setItem('theme', theme);
+      applySavedTheme();
+    }
+
+    // Save custom color for custom theme
+    function onCustomColorChange(color) {
+      localStorage.setItem('customColor', color);
+      applySavedTheme();
+    }
+
+    // Save settings (including theme)
+    function saveSettings() {
+      const theme = document.getElementById("themeSelect").value;
+      const customColor = document.getElementById("customColorPicker").value;
+
+      localStorage.setItem('theme', theme);
+      localStorage.setItem('customColor', customColor);
+
+      alert("Settings saved!");
+    }
+
+    window.onload = function() {
+      applySavedTheme();  // Apply the saved theme on load
+    };
+
+
+    // Load recent chats for notifications
+    function loadNotificationChats() {
+      google.script.run.withSuccessHandler(function(chats) {
+        const notificationChats = document.getElementById("notificationChats");
+        notificationChats.innerHTML = ""; // Clear loading text
+
+        if (chats.length === 0) {
+          notificationChats.innerHTML = "<p>No recent chats available.</p>";
+          return;
+        }
+
+        chats.forEach(chat => {
+          if (!chat.url) {
+            console.warn("Chat URL is missing for chat: ", chat);
+            return; // Skip this chat if no URL
+          }
+
+          const chatIdMatch = chat.url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+          const chatId = chatIdMatch ? chatIdMatch[1] : null;
+
+          if (!chatId) {
+            console.warn("Chat ID could not be extracted from URL: ", chat.url);
+            return; // Skip if ID extraction fails
+          }
+
+          const li = document.createElement("li");
+          li.innerHTML = `
+            <label>
+              <input type="checkbox" id="notify_${chatId}" onchange="toggleChatNotification('${chatId}')">
+              ${chat.name}
+            </label>
+          `;
+          notificationChats.appendChild(li);
+
+          google.script.run.withSuccessHandler(function(isEnabled) {
+            const checkbox = document.getElementById(`notify_${chatId}`);
+            if (checkbox) {
+              checkbox.checked = isEnabled;
+            }
+          }).getNotificationStatus(chatId);
+        });
+      }).getRecentChats();
+    }
+
+    // Toggle notification settings for a chat
+    function toggleChatNotification(chatId) {
+      const isChecked = document.getElementById(`notify_${chatId}`)?.checked;
+      google.script.run[isChecked ? 'enableNotifications' : 'disableNotifications'](chatId);
+    }
+
+    // Save settings (including notifications, theme, etc.)
+    function saveSettings() {
+      // Save theme and custom color
+      const theme = document.getElementById("themeSelect").value;
+      const customColor = document.getElementById("customColorPicker").value;
+
+      localStorage.setItem('theme', theme);
+      localStorage.setItem('customColor', customColor);
+
+      // Save notification statuses
+      const notificationChats = document.getElementById("notificationChats").getElementsByTagName("li");
+      const notifications = {};
+      for (let i = 0; i < notificationChats.length; i++) {
+        const checkbox = notificationChats[i].querySelector("input[type='checkbox']");
+        if (checkbox) {
+          notifications[checkbox.id] = checkbox.checked;
+        }
+      }
+
+      // Store notifications in localStorage
+      localStorage.setItem('notifications', JSON.stringify(notifications));
+
+      alert("Settings saved!");
+    }
+
+    // Clear all chat data
+    function clearAllChatData() {
+      if (confirm("Are you sure? This action is irreversible.")) {
+        localStorage.clear();
+        alert("All chat data cleared!");
+      }
+    }
+
+    // Reset app processes
+    function resetAppProcesses() {
+      if (confirm("Reset app processes? The page will reload.")) {
+        location.reload();
+      }
+    }
+
+    // Check for cache errors
+    function checkCacheErrors() {
+      const keys = Object.keys(localStorage);
+      alert("Cache Keys:\n" + keys.join("\n"));
+    }
+
+    function showChat() {
+      // Try closing using Apps Script's host API (only works in dialogs/sidebars)
+      if (typeof google !== "undefined" && google.script && google.script.host) {
+        try {
+          google.script.host.close();
+          console.log("Closed using google.script.host.close()");
+          return;
+        } catch (e) {
+          console.warn("google.script.host.close() failed:", e);
+        }
+      }
+
+      // Fallback: Attempt to close this window directly
+      window.open('', '_self'); // Required for Chrome
+      window.close(); // Will only work if the window was opened via script
+      console.log("Attempted direct window close");
+    }
+
+    // Load everything when the settings page is loaded
+    window.onload = function() {
+      applySavedTheme();
+      loadNotificationChats();
+    };
+  </script>
+</body>
+</html>
