@@ -4,7 +4,7 @@ function doGet(e) {
     if (path === 'settings.html') {
       return HtmlService.createHtmlOutputFromFile('settings'); // Serve the newTabContent.html file
     }
-    return HtmlService.createHtmlOutputFromFile('chat'); // Serve the main HTML if no specific file requested
+    return HtmlService.createHtmlOutputFromFile('index'); // Serve the main HTML if no specific file requested
   }
   
   function getActiveUserEmail() {
